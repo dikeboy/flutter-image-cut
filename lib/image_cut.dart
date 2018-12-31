@@ -10,11 +10,15 @@ import 'package:flutter/material.dart' as ui;
 import 'package:flutter/painting.dart' as ui;
 import 'package:image_cut/image_detail.dart';
 
+
+
 class ImageLoader {
   static ui.AssetBundle getAssetBundle() => (ui.rootBundle != null)
       ? ui.rootBundle
       : new ui.NetworkAssetBundle(new Uri.directory(Uri.base.origin));
-
+  /**
+   * convert to painting.Image
+   */
   static Future<flutterui.Image> load(String url) async {
     ui.ImageStream stream = new ui.AssetImage(url, bundle: getAssetBundle())
         .resolve(ui.ImageConfiguration.empty);
@@ -32,16 +36,13 @@ class ImageLoader {
 class SignaturePainter extends CustomPainter {
   SignaturePainter(this.points,  this.width, this.height,
       this.cWidth, this.cHeight, this.image);
+  double cWidth = 200;  //clip square width
+  double cHeight = 200;  //clip square height
+  double width;  //total width
+  double height; //total height
+  flutterui.Image image; // source image
 
-  double startX = 0;
-  double startY = 0;
-  double cWidth = 200;
-  double cHeight = 200;
-  double width;
-  double height;
-  flutterui.Image image;
-
-  final List<Offset> points;
+  final List<Offset> points; //point[0] touchDown offset, point[1] touchMoveOffset  point[2] clip square start offset, point[3],image draw size
 
   void paint(Canvas canvas, Size size) {
     Paint paint = new Paint()
@@ -50,6 +51,7 @@ class SignaturePainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..strokeJoin = StrokeJoin.bevel;
     if (image != null) {
+      //draw the backgroud image
       double dwidth = 0;
       double dheight = 0;
       if (image.width.toDouble() / width > image.height.toDouble() / height) {
@@ -69,7 +71,6 @@ class SignaturePainter extends CustomPainter {
               (height - dheight) / 2, dwidth, dheight), paint);
     }
 
-    if (this.points.length > 1) {
       double startX = points[1].dx - points[0].dx + points[2].dx;
       double startY = points[1].dy - points[0].dy + points[2].dy;
       if (startX < 0)
@@ -90,26 +91,16 @@ class SignaturePainter extends CustomPainter {
         Offset(startX, startY + cHeight),
         Offset(startX, startY),
       ];
-      canvas.drawPoints(PointMode.polygon, points2, paint);
+      canvas.drawPoints(PointMode.polygon, points2, paint);//draw the clip box
       paint.color = Colors.red;
 //      paint..style=PaintingStyle.stroke;
       double radius = 10;
-      canvas.drawCircle(points2[0],radius,paint);
+      canvas.drawCircle(points2[0],radius,paint);  //draw the drag point
       canvas.drawCircle(points2[1],radius,paint);
       canvas.drawCircle(points2[2],radius,paint);
 //      canvas.drawLine(Offset(points2[2].dx-radius, points2[2].dy-radius), Offset(points2[2].dx+radius, points2[2].dy+radius), paint);
       canvas.drawCircle(points2[3],radius,paint);
-    }
-    else {
-      List<Offset> points2 = [
-        Offset(startX, startY),
-        Offset(startX + cWidth, startY),
-        Offset(startX + cWidth, startY + cHeight),
-        Offset(startX, startY + cHeight),
-        Offset(startX, startY),
-      ];
-      canvas.drawPoints(PointMode.polygon, points2, paint);
-    }
+
   }
   bool shouldRepaint(SignaturePainter other){
     return true;
@@ -123,7 +114,7 @@ class ImageCutPage extends StatefulWidget {
   @override
   _ImageCutPageState createState() => _ImageCutPageState();
 }
-
+///clip point position
 enum DownPosition{
   LEFT_UP,
   RIGHT_UP,
@@ -180,13 +171,13 @@ class _ImageCutPageState extends State<ImageCutPage> {
             RaisedButton(
                 child: Text("Cut"),
                 onPressed: (){
+                  //convert the clip square  to the clip image
                   double rate =this.image.width.toDouble()/width;
                   var source = Rect.fromLTWH(_points[2].dx *rate,(_points[2].dy-(height-_points[3].dy)/2) *rate,cWidth* rate,cHeight* rate);
                   var dest = Rect.fromLTWH(0,0,cWidth* rate,cHeight* rate);
                   PictureRecorder recorder =  PictureRecorder();
                   Canvas canvas2 = Canvas(recorder);
                   Paint paint2 = new Paint();
-                  paint2.color =Colors.red;
                   canvas2.drawImageRect(image, source, dest, paint2);
                   var image2 = recorder.endRecording().toImage(dest.width.toInt(), dest.height.toInt());
                   Navigator.push(context,new MaterialPageRoute(builder: (context) =>  ImageDetailPage(title: "image",image: image2)));

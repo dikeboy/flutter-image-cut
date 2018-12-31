@@ -88,7 +88,6 @@ class _ImageDetailPageState extends State<ImageDetailPage> {
     var image = await boundary.toImage();
     ByteData byteData = await image.toByteData(format: ImageByteFormat.png);
     Uint8List pngBytes = byteData.buffer.asUint8List();
-    print(pngBytes);
     getApplicationDocumentsDirectory().then((dir){
       String path = dir.path +"/test.png";
       new File(path).writeAsBytesSync(pngBytes);
