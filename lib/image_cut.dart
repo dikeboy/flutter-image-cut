@@ -23,11 +23,12 @@ class ImageLoader {
     ui.ImageStream stream = new ui.AssetImage(url, bundle: getAssetBundle())
         .resolve(ui.ImageConfiguration.empty);
     Completer<flutterui.Image> completer = new Completer<flutterui.Image>();
-    void listener(ui.ImageInfo frame, bool synchronousCall) {
+    ImageStreamListener listener;
+     listener = new ImageStreamListener((ImageInfo frame, bool synchronousCall) {
       final flutterui.Image image = frame.image;
       completer.complete(image);
       stream.removeListener(listener);
-    }
+    });
 
     stream.addListener(listener);
     return completer.future;
@@ -180,7 +181,10 @@ class _ImageCutPageState extends State<ImageCutPage> {
                   Paint paint2 = new Paint();
                   canvas2.drawImageRect(image, source, dest, paint2);
                   var image2 = recorder.endRecording().toImage(dest.width.toInt(), dest.height.toInt());
-                  Navigator.push(context,new MaterialPageRoute(builder: (context) =>  ImageDetailPage(title: "image",image: image2)));
+                  image2.then((value) =>
+                  (Navigator.push(context, new MaterialPageRoute(builder: (context) => ImageDetailPage(title: "image", image: value))))
+                  );
+
 
                 }),
 

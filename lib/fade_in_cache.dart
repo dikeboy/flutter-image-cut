@@ -6,6 +6,7 @@ import 'dart:convert' as convert;
 import 'dart:typed_data';
 import 'dart:ui';
 import 'dart:io';
+import 'dart:async';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -23,28 +24,30 @@ import 'package:http/http.dart' as http;
 ///
 /// Use this class to display long-loading images, such as [new NetworkImage],
 /// so that the image appears on screen with a graceful animation rather than
-/// abruptly pops onto the screen.
+/// abruptly popping onto the screen.
+///
+/// {@youtube 560 315 https://www.youtube.com/watch?v=pK738Pg9cxc}
 ///
 /// If the [image] emits an [ImageInfo] synchronously, such as when the image
-/// has been loaded and cached, the [image] is displayed immediately and the
+/// has been loaded and cached, the [image] is displayed immediately, and the
 /// [placeholder] is never displayed.
 ///
-/// [fadeOutDuration] and [fadeOutCurve] control the fade-out animation of the
-/// placeholder.
+/// The [fadeOutDuration] and [fadeOutCurve] properties control the fade-out
+/// animation of the [placeholder].
 ///
-/// [fadeInDuration] and [fadeInCurve] control the fade-in animation of the
-/// target [image].
+/// The [fadeInDuration] and [fadeInCurve] properties control the fade-in
+/// animation of the target [image].
 ///
-/// Prefer a [placeholder] that's already cached so that it is displayed in one
-/// frame. This prevents it from popping onto the screen.
+/// Prefer a [placeholder] that's already cached so that it is displayed
+/// immediately. This prevents it from popping onto the screen.
 ///
-/// When [image] changes it is resolved to a new [ImageStream]. If the new
-/// [ImageStream.key] is different this widget subscribes to the new stream and
+/// When [image] changes, it is resolved to a new [ImageStream]. If the new
+/// [ImageStream.key] is different, this widget subscribes to the new stream and
 /// replaces the displayed image with images emitted by the new stream.
 ///
 /// When [placeholder] changes and the [image] has not yet emitted an
 /// [ImageInfo], then [placeholder] is resolved to a new [ImageStream]. If the
-/// new [ImageStream.key] is different this widget subscribes to the new stream
+/// new [ImageStream.key] is different, this widget subscribes to the new stream
 /// and replaces the displayed image to images emitted by the new stream.
 ///
 /// When either [placeholder] or [image] changes, this widget continues showing
@@ -62,17 +65,21 @@ import 'package:http/http.dart' as http;
 /// )
 /// ```
 /// {@end-tool}
-class FadeInImage extends StatefulWidget {
-  /// Creates a widget that displays a [placeholder] while an [image] is loading
-  /// then cross-fades to display the [image].
+class FadeInImage extends StatelessWidget {
+  /// Creates a widget that displays a [placeholder] while an [image] is loading,
+  /// then fades-out the placeholder and fades-in the image.
   ///
   /// The [placeholder], [image], [fadeOutDuration], [fadeOutCurve],
   /// [fadeInDuration], [fadeInCurve], [alignment], [repeat], and
   /// [matchTextDirection] arguments must not be null.
+  ///
+  /// If [excludeFromSemantics] is true, then [imageSemanticLabel] will be ignored.
   const FadeInImage({
     Key key,
     @required this.placeholder,
     @required this.image,
+    this.excludeFromSemantics = false,
+    this.imageSemanticLabel,
     this.fadeOutDuration = const Duration(milliseconds: 300),
     this.fadeOutCurve = Curves.easeOut,
     this.fadeInDuration = const Duration(milliseconds: 700),
@@ -80,7 +87,6 @@ class FadeInImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit,
-    this.sdcache,
     this.alignment = Alignment.center,
     this.repeat = ImageRepeat.noRepeat,
     this.matchTextDirection = false,
@@ -98,12 +104,12 @@ class FadeInImage extends StatefulWidget {
   /// Creates a widget that uses a placeholder image stored in memory while
   /// loading the final image from the network.
   ///
-  /// [placeholder] contains the bytes of the in-memory image.
+  /// The `placeholder` argument contains the bytes of the in-memory image.
   ///
-  /// [image] is the URL of the final image.
+  /// The `image` argument is the URL of the final image.
   ///
-  /// [placeholderScale] and [imageScale] are passed to their respective
-  /// [ImageProvider]s (see also [ImageInfo.scale]).
+  /// The `placeholderScale` and `imageScale` arguments are passed to their
+  /// respective [ImageProvider]s (see also [ImageInfo.scale]).
   ///
   /// The [placeholder], [image], [placeholderScale], [imageScale],
   /// [fadeOutDuration], [fadeOutCurve], [fadeInDuration], [fadeInCurve],
@@ -122,9 +128,11 @@ class FadeInImage extends StatefulWidget {
     @required String image,
     double placeholderScale = 1.0,
     double imageScale = 1.0,
-    this.fadeOutDuration = const Duration(milliseconds: 100),
+    this.excludeFromSemantics = false,
+    this.imageSemanticLabel,
+    this.fadeOutDuration = const Duration(milliseconds: 300),
     this.fadeOutCurve = Curves.easeOut,
-    this.fadeInDuration = const Duration(milliseconds: 100),
+    this.fadeInDuration = const Duration(milliseconds: 700),
     this.fadeInCurve = Curves.easeIn,
     this.width,
     this.height,
@@ -132,7 +140,7 @@ class FadeInImage extends StatefulWidget {
     this.alignment = Alignment.center,
     this.repeat = ImageRepeat.noRepeat,
     this.matchTextDirection = false,
-    this.sdcache =false,
+    bool sdcache =false
   }) : assert(placeholder != null),
         assert(image != null),
         assert(placeholderScale != null),
@@ -151,14 +159,14 @@ class FadeInImage extends StatefulWidget {
   /// Creates a widget that uses a placeholder image stored in an asset bundle
   /// while loading the final image from the network.
   ///
-  /// [placeholder] is the key of the image in the asset bundle.
+  /// The `placeholder` argument is the key of the image in the asset bundle.
   ///
-  /// [image] is the URL of the final image.
+  /// The `image` argument is the URL of the final image.
   ///
-  /// [placeholderScale] and [imageScale] are passed to their respective
-  /// [ImageProvider]s (see also [ImageInfo.scale]).
+  /// The `placeholderScale` and `imageScale` arguments are passed to their
+  /// respective [ImageProvider]s (see also [ImageInfo.scale]).
   ///
-  /// If [placeholderScale] is omitted or is null, the pixel-density-aware asset
+  /// If `placeholderScale` is omitted or is null, pixel-density-aware asset
   /// resolution will be attempted for the [placeholder] image. Otherwise, the
   /// exact asset specified will be used.
   ///
@@ -179,6 +187,8 @@ class FadeInImage extends StatefulWidget {
     AssetBundle bundle,
     double placeholderScale,
     double imageScale = 1.0,
+    this.excludeFromSemantics = false,
+    this.imageSemanticLabel,
     this.fadeOutDuration = const Duration(milliseconds: 300),
     this.fadeOutCurve = Curves.easeOut,
     this.fadeInDuration = const Duration(milliseconds: 700),
@@ -186,10 +196,10 @@ class FadeInImage extends StatefulWidget {
     this.width,
     this.height,
     this.fit,
-    this.sdcache,
     this.alignment = Alignment.center,
     this.repeat = ImageRepeat.noRepeat,
     this.matchTextDirection = false,
+    bool sdcache =false
   }) : assert(placeholder != null),
         assert(image != null),
         placeholder = placeholderScale != null
@@ -209,7 +219,7 @@ class FadeInImage extends StatefulWidget {
   /// Image displayed while the target [image] is loading.
   final ImageProvider placeholder;
 
-  /// The target image that is displayed.
+  /// The target image that is displayed once it has loaded.
   final ImageProvider image;
 
   /// The duration of the fade-out animation for the [placeholder].
@@ -240,7 +250,6 @@ class FadeInImage extends StatefulWidget {
   /// also affected by the scale factor.
   final double height;
 
-  final bool  sdcache;
   /// How to inscribe the image into the space allocated during layout.
   ///
   /// The default varies based on the other fields. See the discussion at
@@ -291,262 +300,207 @@ class FadeInImage extends StatefulWidget {
   /// scope.
   final bool matchTextDirection;
 
-  @override
-  State<StatefulWidget> createState() => _FadeInImageState();
-}
-
-
-/// The phases a [FadeInImage] goes through.
-@visibleForTesting
-enum FadeInImagePhase {
-  /// The initial state.
+  /// Whether to exclude this image from semantics.
   ///
-  /// We do not yet know whether the target image is ready and therefore no
-  /// animation is necessary, or whether we need to use the placeholder and
-  /// wait for the image to load.
-  start,
+  /// This is useful for images which do not contribute meaningful information
+  /// to an application.
+  final bool excludeFromSemantics;
 
-  /// Waiting for the target image to load.
-  waiting,
+  /// A semantic description of the [image].
+  ///
+  /// Used to provide a description of the [image] to TalkBack on Android, and
+  /// VoiceOver on iOS.
+  ///
+  /// This description will be used both while the [placeholder] is shown and
+  /// once the image has loaded.
+  final String imageSemanticLabel;
 
-  /// Fading out previous image.
-  fadeOut,
 
-  /// Fading in new image.
-  fadeIn,
 
-  /// Fade-in complete.
-  completed,
-}
-
-typedef _ImageProviderResolverListener = void Function();
-
-class _ImageProviderResolver {
-  _ImageProviderResolver({
-    @required this.state,
-    @required this.listener,
-  });
-
-  final _FadeInImageState state;
-  final _ImageProviderResolverListener listener;
-
-  FadeInImage get widget => state.widget;
-
-  ImageStream _imageStream;
-  ImageInfo _imageInfo;
-
-  void resolve(ImageProvider provider) {
-    final ImageStream oldImageStream = _imageStream;
-    _imageStream = provider.resolve(createLocalImageConfiguration(
-        state.context,
-        size: widget.width != null && widget.height != null ? Size(widget.width, widget.height) : null
-    ));
-    if(_imageStream!=null){
-    }
-    assert(_imageStream != null);
-
-    if (_imageStream.key != oldImageStream?.key) {
-      oldImageStream?.removeListener(_handleImageChanged);
-      _imageStream.addListener(_handleImageChanged);
-    }
-  }
-
-  void _handleImageChanged(ImageInfo imageInfo, bool synchronousCall) {
-    _imageInfo = imageInfo;
-    listener();
-  }
-
-  void stopListening() {
-    _imageStream?.removeListener(_handleImageChanged);
-  }
-}
-
-class _FadeInImageState extends State<FadeInImage> with TickerProviderStateMixin {
-  _ImageProviderResolver _imageResolver;
-  _ImageProviderResolver _placeholderResolver;
-
-  AnimationController _controller;
-  Animation<double> _animation;
-
-  FadeInImagePhase _phase = FadeInImagePhase.start;
-  FadeInImagePhase get phase => _phase;
-
-  @override
-  void initState() {
-    _imageResolver = _ImageProviderResolver(state: this, listener: _updatePhase);
-    _placeholderResolver = _ImageProviderResolver(state: this, listener: () {
-      setState(() {
-        // Trigger rebuild to display the placeholder image
-      });
-    });
-    _controller = AnimationController(
-      value: 1.0,
-      vsync: this,
+  Image _image({
+    @required ImageProvider image,
+    ImageFrameBuilder frameBuilder,
+  }) {
+    assert(image != null);
+    return Image(
+      image: image,
+      frameBuilder: frameBuilder,
+      width: width,
+      height: height,
+      fit: fit,
+      alignment: alignment,
+      repeat: repeat,
+      matchTextDirection: matchTextDirection,
+      gaplessPlayback: true,
+      excludeFromSemantics: true,
     );
-    _controller.addListener(() {
-      setState(() {
-        // Trigger rebuild to update opacity value.
-      });
-    });
-    _controller.addStatusListener((AnimationStatus status) {
-      _updatePhase();
-    });
-    super.initState();
-  }
-
-  @override
-  void didChangeDependencies() {
-    _resolveImage();
-    super.didChangeDependencies();
-  }
-
-  @override
-  void didUpdateWidget(FadeInImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.image != oldWidget.image || widget.placeholder != oldWidget.placeholder)
-      _resolveImage();
-  }
-
-  @override
-  void reassemble() {
-    _resolveImage(); // in case the image cache was flushed
-    super.reassemble();
-  }
-
-  void _resolveImage() {
-    _imageResolver.resolve(widget.image);
-
-    // No need to resolve the placeholder if we are past the placeholder stage.
-    if (_isShowingPlaceholder)
-      _placeholderResolver.resolve(widget.placeholder);
-
-    if (_phase == FadeInImagePhase.start)
-      _updatePhase();
-  }
-
-  void _updatePhase() {
-    setState(() {
-      switch (_phase) {
-        case FadeInImagePhase.start:
-          if (_imageResolver._imageInfo != null)
-            _phase = FadeInImagePhase.completed;
-          else
-            _phase = FadeInImagePhase.waiting;
-          break;
-        case FadeInImagePhase.waiting:
-          if (_imageResolver._imageInfo != null) {
-            // Received image data. Begin placeholder fade-out.
-            _controller.duration = widget.fadeOutDuration;
-            _animation = CurvedAnimation(
-              parent: _controller,
-              curve: widget.fadeOutCurve,
-            );
-            _phase = FadeInImagePhase.fadeOut;
-            _controller.reverse(from: 1.0);
-          }
-          break;
-        case FadeInImagePhase.fadeOut:
-          if (_controller.status == AnimationStatus.dismissed) {
-            // Done fading out placeholder. Begin target image fade-in.
-            _controller.duration = widget.fadeInDuration;
-            _animation = CurvedAnimation(
-              parent: _controller,
-              curve: widget.fadeInCurve,
-            );
-            _phase = FadeInImagePhase.fadeIn;
-            _placeholderResolver.stopListening();
-            _controller.forward(from: 0.0);
-          }
-          break;
-        case FadeInImagePhase.fadeIn:
-          if (_controller.status == AnimationStatus.completed) {
-            // Done finding in new image.
-            _phase = FadeInImagePhase.completed;
-          }
-          break;
-        case FadeInImagePhase.completed:
-        // Nothing to do.
-          break;
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _imageResolver.stopListening();
-    _placeholderResolver.stopListening();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  bool get _isShowingPlaceholder {
-    assert(_phase != null);
-    switch (_phase) {
-      case FadeInImagePhase.start:
-      case FadeInImagePhase.waiting:
-      case FadeInImagePhase.fadeOut:
-        return true;
-      case FadeInImagePhase.fadeIn:
-      case FadeInImagePhase.completed:
-        return false;
-    }
-
-    return null;
-  }
-
-  ImageInfo get _imageInfo {
-    return _isShowingPlaceholder
-        ? _placeholderResolver._imageInfo
-        : _imageResolver._imageInfo;
   }
 
   @override
   Widget build(BuildContext context) {
-    assert(_phase != FadeInImagePhase.start);
-    final ImageInfo imageInfo = _imageInfo;
-    return RawImage(
-      image: imageInfo?.image,
-      width: widget.width,
-      height: widget.height,
-      scale: imageInfo?.scale ?? 1.0,
-      color: Color.fromRGBO(255, 255, 255, _animation?.value ?? 1.0),
-      colorBlendMode: BlendMode.modulate,
-      fit: widget.fit,
-      alignment: widget.alignment,
-      repeat: widget.repeat,
-      matchTextDirection: widget.matchTextDirection,
+    Widget result = _image(
+      image: image,
+      frameBuilder: (BuildContext context, Widget child, int frame, bool wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded)
+          return child;
+        return _AnimatedFadeOutFadeIn(
+          target: child,
+          placeholder: _image(image: placeholder),
+          isTargetLoaded: frame != null,
+          fadeInDuration: fadeInDuration,
+          fadeOutDuration: fadeOutDuration,
+          fadeInCurve: fadeInCurve,
+          fadeOutCurve: fadeOutCurve,
+        );
+      },
+    );
+
+    if (!excludeFromSemantics) {
+      result = Semantics(
+        container: imageSemanticLabel != null,
+        image: true,
+        label: imageSemanticLabel ?? '',
+        child: result,
+      );
+    }
+
+    return result;
+  }
+}
+
+class _AnimatedFadeOutFadeIn extends ImplicitlyAnimatedWidget {
+  const _AnimatedFadeOutFadeIn({
+    Key key,
+    @required this.target,
+    @required this.placeholder,
+    @required this.isTargetLoaded,
+    @required this.fadeOutDuration,
+    @required this.fadeOutCurve,
+    @required this.fadeInDuration,
+    @required this.fadeInCurve,
+  }) : assert(target != null),
+        assert(placeholder != null),
+        assert(isTargetLoaded != null),
+        assert(fadeOutDuration != null),
+        assert(fadeOutCurve != null),
+        assert(fadeInDuration != null),
+        assert(fadeInCurve != null),
+        super(key: key, duration: fadeInDuration + fadeOutDuration);
+
+  final Widget target;
+  final Widget placeholder;
+  final bool isTargetLoaded;
+  final Duration fadeInDuration;
+  final Duration fadeOutDuration;
+  final Curve fadeInCurve;
+  final Curve fadeOutCurve;
+
+  @override
+  _AnimatedFadeOutFadeInState createState() => _AnimatedFadeOutFadeInState();
+}
+
+class _AnimatedFadeOutFadeInState extends ImplicitlyAnimatedWidgetState<_AnimatedFadeOutFadeIn> {
+  Tween<double> _targetOpacity;
+  Tween<double> _placeholderOpacity;
+  Animation<double> _targetOpacityAnimation;
+  Animation<double> _placeholderOpacityAnimation;
+
+  @override
+  void forEachTween(TweenVisitor<dynamic> visitor) {
+    _targetOpacity = visitor(
+      _targetOpacity,
+      widget.isTargetLoaded ? 1.0 : 0.0,
+          (dynamic value) => Tween<double>(begin: value),
+    );
+    _placeholderOpacity = visitor(
+      _placeholderOpacity,
+      widget.isTargetLoaded ? 0.0 : 1.0,
+          (dynamic value) => Tween<double>(begin: value),
     );
   }
 
   @override
-  void debugFillProperties(DiagnosticPropertiesBuilder description) {
-    super.debugFillProperties(description);
-    description.add(EnumProperty<FadeInImagePhase>('phase', _phase));
-    description.add(DiagnosticsProperty<ImageInfo>('pixels', _imageInfo));
-    description.add(DiagnosticsProperty<ImageStream>('image stream', _imageResolver._imageStream));
-    description.add(DiagnosticsProperty<ImageStream>('placeholder stream', _placeholderResolver._imageStream));
+  void didUpdateTweens() {
+    _placeholderOpacityAnimation = animation.drive(TweenSequence<double>(<TweenSequenceItem<double>>[
+      TweenSequenceItem<double>(
+        tween: _placeholderOpacity.chain(CurveTween(curve: widget.fadeOutCurve)),
+        weight: widget.fadeOutDuration.inMilliseconds.toDouble(),
+      ),
+      TweenSequenceItem<double>(
+        tween: ConstantTween<double>(0),
+        weight: widget.fadeInDuration.inMilliseconds.toDouble(),
+      ),
+    ]));
+    _targetOpacityAnimation = animation.drive(TweenSequence<double>(<TweenSequenceItem<double>>[
+      TweenSequenceItem<double>(
+        tween: ConstantTween<double>(0),
+        weight: widget.fadeOutDuration.inMilliseconds.toDouble(),
+      ),
+      TweenSequenceItem<double>(
+        tween: _targetOpacity.chain(CurveTween(curve: widget.fadeInCurve)),
+        weight: widget.fadeInDuration.inMilliseconds.toDouble(),
+      ),
+    ]));
+    if (!widget.isTargetLoaded && _isValid(_placeholderOpacity) && _isValid(_targetOpacity)) {
+      // Jump (don't fade) back to the placeholder image, so as to be ready
+      // for the full animation when the new target image becomes ready.
+      controller.value = controller.upperBound;
+    }
+  }
+
+  bool _isValid(Tween<double> tween) {
+    return tween.begin != null && tween.end != null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.passthrough,
+      alignment: AlignmentDirectional.center,
+      // Text direction is irrelevant here since we're using center alignment,
+      // but it allows the Stack to avoid a call to Directionality.of()
+      textDirection: TextDirection.ltr,
+      children: <Widget>[
+        FadeTransition(
+          opacity: _targetOpacityAnimation,
+          child: widget.target,
+        ),
+        FadeTransition(
+          opacity: _placeholderOpacityAnimation,
+          child: widget.placeholder,
+        ),
+      ],
+    );
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Animation<double>>('targetOpacity', _targetOpacityAnimation));
+    properties.add(DiagnosticsProperty<Animation<double>>('placeholderOpacity', _placeholderOpacityAnimation));
   }
 }
 
 
-class MyNetworkImage extends ImageProvider<MyNetworkImage> {
+/// The dart:io implemenation of [image_provider.NetworkImage].
+class MyNetworkImage extends ImageProvider<MyNetworkImage>{
   /// Creates an object that fetches the image at the given URL.
   ///
-  /// The arguments must not be null.
-  const MyNetworkImage(this.url, { this.scale = 1.0 , this.headers,this.sdCache })
+  /// The arguments [url] and [scale] must not be null.
+  const MyNetworkImage(this.url, { this.scale = 1.0, this.headers,this.sdCache })
       : assert(url != null),
         assert(scale != null);
 
-  /// The URL from which the image will be fetched.
+  @override
   final String url;
 
-  final bool sdCache;
-
-  /// The scale to place in the [ImageInfo] object of the image.
+  @override
   final double scale;
 
-  /// The HTTP headers that will be used with [HttpClient.get] to fetch image from network.
+  @override
   final Map<String, String> headers;
+
+  final bool sdCache;
 
   @override
   Future<MyNetworkImage> obtainKey(ImageConfiguration configuration) {
@@ -555,41 +509,82 @@ class MyNetworkImage extends ImageProvider<MyNetworkImage> {
 
   @override
   ImageStreamCompleter load(MyNetworkImage key) {
+    // Ownership of this controller is handed off to [_loadAsync]; it is that
+    // method's responsibility to close the controller's stream when the image
+    // has been loaded or an error is thrown.
+    final StreamController<ImageChunkEvent> chunkEvents = StreamController<ImageChunkEvent>();
+
     return MultiFrameImageStreamCompleter(
-        codec: _loadAsync(key),
-        scale: key.scale,
-        informationCollector: (StringBuffer information) {
-          information.writeln('Image provider: $this');
-          information.write('Image key: $key');
-        }
+      codec: _loadAsync(key, chunkEvents),
+      chunkEvents: chunkEvents.stream,
+      scale: key.scale,
+      informationCollector: () {
+        return <DiagnosticsNode>[
+          DiagnosticsProperty<ImageProvider>('Image provider', this),
+          DiagnosticsProperty<MyNetworkImage>('Image key', key),
+        ];
+      },
     );
   }
 
+  // Do not access this field directly; use [_httpClient] instead.
+  // We set `autoUncompress` to false to ensure that we can trust the value of
+  // the `Content-Length` HTTP header. We automatically uncompress the content
+  // in our call to [consolidateHttpClientResponseBytes].
+  static final HttpClient _sharedHttpClient = HttpClient()..autoUncompress = false;
 
-  Future<Codec> _loadAsync(MyNetworkImage key) async {
-    assert(key == this);
-    if(sdCache==null){
-      final Uint8List bytes =await  _getFromSdcard(key.url);
-      if (bytes!=null&&bytes.lengthInBytes!=null&&bytes.lengthInBytes!= 0) {
-        print("success");
-        return await PaintingBinding.instance.instantiateImageCodec(bytes);
+  static HttpClient get _httpClient {
+    HttpClient client = _sharedHttpClient;
+    assert(() {
+      if (debugNetworkImageHttpClientProvider != null)
+        client = debugNetworkImageHttpClientProvider();
+      return true;
+    }());
+    return client;
+  }
+
+  Future<Codec> _loadAsync(
+      MyNetworkImage key,
+      StreamController<ImageChunkEvent> chunkEvents,
+      ) async {
+    try {
+      assert(key == this);
+
+      if(sdCache==null){
+        final Uint8List bytes =await  _getFromSdcard(key.url);
+        if (bytes!=null&&bytes.lengthInBytes!=null&&bytes.lengthInBytes!= 0) {
+          print("success");
+          return await PaintingBinding.instance.instantiateImageCodec(bytes);
+        }
       }
-    }
-    final Uri resolved = Uri.base.resolve(key.url);
-    http.Response response  = await http.get(resolved);
+      final Uri resolved = Uri.base.resolve(key.url);
+      final HttpClientRequest request = await _httpClient.getUrl(resolved);
+      headers?.forEach((String name, String value) {
+        request.headers.add(name, value);
+      });
+      final HttpClientResponse response = await request.close();
+      if (response.statusCode != HttpStatus.ok)
+        throw NetworkImageLoadException(statusCode: response.statusCode, uri: resolved);
 
-    if (response.statusCode != HttpStatus.ok)
-      throw Exception('HTTP request failed, statusCode: ${response?.statusCode}, $resolved');
+      final Uint8List bytes = await consolidateHttpClientResponseBytes(
+        response,
+        onBytesReceived: (int cumulative, int total) {
+          chunkEvents.add(ImageChunkEvent(
+            cumulativeBytesLoaded: cumulative,
+            expectedTotalBytes: total,
+          ));
+        },
+      );
+      if (bytes.lengthInBytes == 0)
+        throw Exception('NetworkImage is an empty file: $resolved');
 
-    final Uint8List bytes = await response.bodyBytes;
-    print("save =${sdCache}");
-    if(sdCache==null&&bytes.lengthInBytes != 0){
+      if(sdCache==null&&bytes.lengthInBytes != 0){
         _saveToImage(bytes, key.url);
+      }
+      return PaintingBinding.instance.instantiateImageCodec(bytes);
+    } finally {
+      chunkEvents.close();
     }
-    if (bytes.lengthInBytes == 0)
-      throw Exception('MyNetworkImage is an empty file: $resolved');
-
-    return await PaintingBinding.instance.instantiateImageCodec(bytes);
   }
 
   @override
@@ -610,22 +605,23 @@ class MyNetworkImage extends ImageProvider<MyNetworkImage> {
 
   void _saveToImage(Uint8List mUint8List,String name) async  {
     name = md5.convert(convert.utf8.encode(name)).toString();
-     Directory dir = await getTemporaryDirectory();
-     String path = dir.path +"/"+name;
-     var file = File(path);
-      bool exist =  await file.exists();
-      print("path =${path}");
-     if(!exist)
-          File(path).writeAsBytesSync(mUint8List);
+    Directory dir = await getTemporaryDirectory();
+    String path = dir.path +"/"+name;
+    var file = File(path);
+    bool exist =  await file.exists();
+    print("path =${path}");
+    if(!exist)
+      File(path).writeAsBytesSync(mUint8List);
   }
-   _getFromSdcard(String name) async{
-     name = md5.convert(convert.utf8.encode(name)).toString();
+  _getFromSdcard(String name) async{
+    name = md5.convert(convert.utf8.encode(name)).toString();
     Directory dir = await getTemporaryDirectory();
     String path = dir.path +"/"+name;
     var file = File(path);
     bool exist =  await file.exists();
     if(exist){
       final Uint8List bytes = await file.readAsBytes();
+
       return bytes;
     }
     return null;
