@@ -507,8 +507,8 @@ class MyNetworkImage extends ImageProvider<MyNetworkImage>{
     return SynchronousFuture<MyNetworkImage>(this);
   }
 
-  @override
-  ImageStreamCompleter load(MyNetworkImage key) {
+  @protected
+  ImageStreamCompleter load(MyNetworkImage key, DecoderCallback decode){
     // Ownership of this controller is handed off to [_loadAsync]; it is that
     // method's responsibility to close the controller's stream when the image
     // has been loaded or an error is thrown.
